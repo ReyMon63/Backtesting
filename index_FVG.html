@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Backtesting FVG</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      background-color: #1a1a1a;
+      color: #ffffff;
+      font-family: Arial, sans-serif;
+    }
+    .window {
+      display: block;
+    }
+    .card {
+      background-color: #2a2a2a;
+      padding: 1rem;
+      border-radius: 0.5rem;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+  </style>
+</head>
+<body class="min-h-screen flex items-center justify-center">
+  <div id="app" class="container mx-auto p-4 max-w-4xl">
+    <div id="window1" class="window">
+      <h1 class="text-2xl font-bold mb-4">Parámetros de Backtesting</h1>
+      <form id="paramsForm" class="space-y-4">
+        <div>
+          <label for="activo" class="block mb-1">Activo</label>
+          <select id="activo" class="bg-gray-800 text-white p-2 rounded w-full">
+            <option value="NQ=F">NQ=F (Nasdaq 100 Futures)</option>
+            <option value="ES=F">ES=F (S&P 500 Futures)</option>
+            <option value="6E=F">6E=F (Euro FX Futures)</option>
+          </select>
+        </div>
+        <div>
+          <label for="capital" class="block mb-1">Capital</label>
+          <input type="number" id="capital" min="1000" max="1000000" value="100000" class="bg-gray-800 text-white p-2 rounded w-full">
+        </div>
+        <div>
+          <label for="riesgo" class="block mb-1">Riesgo por Operación</label>
+          <select id="riesgo" class="bg-gray-800 text-white p-2 rounded w-full">
+            <option value="0.5">0.5%</option>
+            <option value="1.0" selected>1.0%</option>
+            <option value="1.5">1.5%</option>
+            <option value="2.0">2.0%</option>
+          </select>
+        </div>
+        <div>
+          <label for="sesion" class="block mb-1">Sesión</label>
+          <select id="sesion" class="bg-gray-800 text-white p-2 rounded w-full">
+            <option value="matutina" selected>Matutina 9:30-10:00 NY</option>
+            <option value="nocturna">Nocturna 20:00-20:30 NY</option>
+          </select>
+        </div>
+        <div>
+          <label for="fechaInicio" class="block mb-1">Fecha Inicio</label>
+          <input type="date" id="fechaInicio" value="2025-01-01" class="bg-gray-800 text-white p-2 rounded w-full">
+        </div>
+        <div>
+          <label for="fechaFin" class="block mb-1">Fecha Fin</label>
+          <input type="date" id="fechaFin" value="2025-08-24" class="bg-gray-800 text-white p-2 rounded w-full">
+        </div>
+        <div class="flex items-center">
+          <input type="checkbox" id="moverSL" checked class="mr-2">
+          <label for="moverSL">Mover SL a Break-Even</label>
+        </div>
+        <div>
+          <label for="velaSL" class="block mb-1">Vela para SL</label>
+          <select id="velaSL" class="bg-gray-800 text-white p-2 rounded w-full">
+            <option value="1" selected>1</option>
+            <option value="2">2</option>
+          </select>
+        </div>
+        <div>
+          <label for="rangoInicial" class="block mb-1">Rango Inicial (min)</label>
+          <input type="number" id="rangoInicial" min="3" max="10" value="5" class="bg-gray-800 text-white p-2 rounded w-full">
+        </div>
+        <div>
+          <label for="ventanaOperacion" class="block mb-1">Ventana de Operación (min)</label>
+          <input type="number" id="ventanaOperacion" min="15" max="60" value="30" class="bg-gray-800 text-white p-2 rounded w-full">
+        </div>
+        <div id="validationMessage" class="mt-2"></div>
+        <button type="button" id="backtestBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">Backtest</button>
+      </form>
+    </div>
+    <div id="window2" class="window hidden">
+      <h1 class="text-2xl font-bold mb-4">Resumen</h1>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+        <div class="card">
+          <h2 class="font-bold">Capital Inicial</h2>
+          <p id="capitalInicial"></p>
+        </div>
+        <div class="card">
+          <h2 class="font-bold">Capital Final</h2>
+          <p id="capitalFinal"></p>
+        </div>
+        <div class="card">
+          <h2 class="font-bold">Profit/Loss</h2>
+          <p id="profitLoss"></p>
+        </div>
+        <div class="card">
+          <h2 class="font-bold">Win Rate</h2>
+          <p id="winRate"></p>
+        </div>
+        <div class="card">
+          <h2 class="font-bold">Drawdown Máximo</h2>
+          <p id="maxDrawdown"></p>
+        </div>
+        <div class="card">
+          <h2 class="font-bold">Profit Factor</h2>
+          <p id="profitFactor"></p>
+        </div>
+        <div class="card">
+          <h2 class="font-bold">Rendimiento Mensual Promedio</h2>
+          <p id="rendimientoMensual"></p>
+        </div>
+        <div class="card">
+          <h2 class="font-bold">Días Sin Operar</h2>
+          <p id="diasSinOperar"></p>
+        </div>
+      </div>
+      <div id="dataValidation" class="mb-4"></div>
+      <div class="space-x-4">
+        <button onclick="showWindow(1)" class="bg-gray-600 hover:bg-gray-700 text-white py-2 px-4 rounded">Volver a Parámetros</button>
+        <button onclick="showWindow(3)" class="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded">Gráficos</button>
+        <button onclick="showWindow(4)" class="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded">Log</button>
+      </div>
+    </div>
+    <div id="window3" class="window hidden">
+      <h1 class="text-2xl font-bold mb-4">Gráficos</h1>
+      <canvas id="balanceChart" class="mb-4"></canvas>
+      <canvas id="pnlChart" class="mb-4"></canvas>
+      <div class="space-x-4">
+        <button onclick="showWindow(2)" class="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded">Resumen</button>
+        <button onclick="showWindow(4)" class="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded">Log</button>
+      </div>
+    </div>
+    <div id="window4" class="window hidden">
+      <h1 class="text-2xl font-bold mb-4">Log</h1>
+      <details open>
+        <summary class="font-bold mb-2 cursor-pointer">Log de Operaciones</summary>
+        <div class="overflow-y-auto h-96 bg-gray-800 p-4 rounded">
+          <table class="w-full table-auto">
+            <tbody id="logBody"></tbody>
+          </table>
+        </div>
+      </details>
+      <div class="space-x-4 mt-4">
+        <button id="exportCsvBtn" class="bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded">Exportar Log a CSV</button>
+        <button id="generateMt5Btn" class="bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded">Generar Código para MetaTrader 5</button>
+        <button onclick="showWindow(2)" class="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded">Resumen</button>
+        <button onclick="showWindow(3)" class="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded">Gráficos</button>
+      </div>
+    </div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    function showWindow(num) {
+      const windows = ['window1', 'window2', 'window3', 'window4'];
+      windows.forEach(id => document.getElementById(id).classList.add('hidden'));
+      document.getElementById(`window${num}`).classList.remove('hidden');
+    }
+
+    const pointValues = {
+      'NQ=F': 20,
+      'ES=F': 50,
+      '6E=F': 12.5
+    };
+
+    document.getElementById('backtestBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('backtestBtn');
+      btn.innerText = 'Procesando...';
+      btn.disabled = true;
+
+      const validationMessage = document.getElementById('validationMessage');
+      validationMessage.innerText = '';
+      validationMessage.classList.remove('text-green-500', 'text-yellow-500');
+
+      const symbol = document.getElementById('activo').value;
+      const validationUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}`;
+      try {
+        const response = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(validationUrl)}`);
+        if (!response.ok) throw new Error();
+        const data = await response.json();
+        const parsed = JSON.parse(data.contents);
+        if (!parsed.chart.result) throw new Error();
+        validationMessage.innerText = `Datos validados para ${symbol}`;
+        validationMessage.classList.add('text-green-500');
+      } catch (e) {
+        validationMessage.innerText = 'Símbolo inválido, usa NQ=F, ES=F o 6E=F';
+        validationMessage.classList.add('text-yellow-500');
+        btn.innerText = 'Backtest';
+        btn.disabled = false;
+        return;
+      }
+
+      const params = {
+        symbol,
+        capital: parseFloat(document.getElementById('capital').value),
+        riesgo: parseFloat(document.getElementById('riesgo').value) / 100,
+        sesion: document.getElementById('sesion').value,
+        startDate: new Date(document.getElementById('fechaInicio').value),
+        endDate: new Date(document.getElementById('fechaFin').value),
+        moverSL: document.getElementById('moverSL').checked,
+        velaSL: parseInt(document.getElementById('velaSL').value),
+        rangoInicial: parseInt(document.getElementById('rangoInicial').value),
+        ventana: parseInt(document.getElementById('ventanaOperacion').value),
+      };
+
+      // Note: Due to Yahoo limits, if period >7 days, may fail. App will show error.
+
+      const startUnix = Math.floor(params.startDate.getTime() / 1000);
+      const endUnix = Math.floor(params.endDate.getTime() / 1000);
+      const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1m&period1=${startUnix}&period2=${endUnix}`;
+      let chart;
+      try {
+        const response = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(yahooUrl)}`);
+        if (!response.ok) throw new Error('Error fetching data');
+        const data = await response.json();
+        chart = JSON.parse(data.contents).chart.result[0];
+        if (!chart) throw new Error('No data returned');
+      } catch (e) {
+        validationMessage.innerText = 'Error al obtener datos. Periodo puede ser demasiado largo para 1m (máx 7 días).';
+        validationMessage.classList.add('text-yellow-500');
+        btn.innerText = 'Backtest';
+        btn.disabled = false;
+        return;
+      }
+
+      const timestamps = chart.timestamp;
+      const quotes = chart.indicators.quote[0];
+      const opens = quotes.open;
+      const highs = quotes.high;
+      const lows = quotes.low;
+      const closes = quotes.close;
+      const volumes = quotes.volume;
+
+      let currentCapital = params.capital;
+      let balanceHistory = [];
+      let monthlyPnl = {};
+      let log = [];
+      let wins = 0;
+      let losses = 0;
+      let winsAmount = 0;
+      let lossesAmount = 0;
+      let maxDrawdown = 0;
+      let peak = params.capital;
+      let daysNoTrade = 0;
+      let totalProfit = 0;
+
+      log.push(`${new Date().toISOString()} 🔵 Iniciando backtesting...`);
+      log.push(`${new Date().toISOString()} 📊 Activo: ${params.symbol}, Capital: $${params.capital}`);
+
+      const days = [];
+      let currentDay = new Date(params.startDate);
+      while (currentDay <= params.endDate) {
+        if (currentDay.getDay() !== 0 && currentDay.getDay() !== 6) {
+          days.push(new Date(currentDay));
+        }
+        currentDay.setDate(currentDay.getDate() + 1);
+      }
+
+      for (const day of days) {
+        const year = day.getFullYear();
+        const month = String(day.getMonth() + 1).padStart(2, '0');
+        const d = String(day.getDate()).padStart(2, '0');
+        const startTime = params.sesion === 'matutina' ? '09:30:00' : '20:00:00';
+        const endTime = params.sesion === 'matutina' ? '10:00:00' : '20:30:00';
+        const offset = '-04:00'; // Assuming EDT
+        const sessionStartIso = `${year}-${month}-${d}T${startTime}${offset}`;
+        const sessionEndIso = `${year}-${month}-${d}T${endTime}${offset}`;
+        const sessionStartUtc = new Date(sessionStartIso).getTime();
+        const sessionEndUtc = new Date(sessionEndIso).getTime();
+
+        const sessionIndices = [];
+        for (let i = 0; i < timestamps.length; i++) {
+          const ts = timestamps[i] * 1000;
+          if (ts >= sessionStartUtc && ts < sessionEndUtc + 60000) {
+            sessionIndices.push(i);
+          }
+        }
+
+        if (sessionIndices.length < params.ventana) {
+          log.push(`${new Date(sessionStartUtc).toISOString()} 🟡 No suficientes datos para la sesión`);
+          daysNoTrade++;
+          continue;
+        }
+
+        log.push(`${new Date(sessionStartUtc).toISOString()} 🔍 Sesión ${day.toISOString().split('T')[0]} ${params.sesion} (${startTime.slice(0,5)}-${endTime.slice(0,5)})`);
+
+        const sessionHighs = sessionIndices.map(idx => highs[idx]);
+        const sessionLows = sessionIndices.map(idx => lows[idx]);
+        const sessionCloses = sessionIndices.map(idx => closes[idx]);
+        const sessionOpens = sessionIndices.map(idx => opens[idx]);
+        const sessionVolumes = sessionIndices.map(idx => volumes[idx]);
+        const sessionTimestamps = sessionIndices.map(idx => timestamps[idx] * 1000);
+
+        const rangeBars = params.rangoInicial;
+        if (sessionIndices.length < rangeBars + 2) continue; // Need at least for vela3
+
+        const rangeHigh = Math.max(...sessionHighs.slice(0, rangeBars));
+        const rangeLow = Math.min(...sessionLows.slice(0, rangeBars));
+
+        let tradeOpened = false;
+
+        for (let bar = rangeBars; bar < params.ventana - 1; bar++) { // Need vela3 = bar+1
+          const close = sessionCloses[bar];
+          let direction, fvgLow, fvgHigh, sl, tp, entry;
+          if (close > rangeHigh) {
+            const high1 = sessionHighs[bar - 1];
+            const low3 = sessionLows[bar + 1];
+            if (high1 < low3) {
+              fvgLow = high1;
+              fvgHigh = low3;
+              direction = 'LONG';
+            }
+          } else if (close < rangeLow) {
+            const low1 = sessionLows[bar - 1];
+            const high3 = sessionHighs[bar + 1];
+            if (low1 > high3) {
+              fvgLow = high3;
+              fvgHigh = low1;
+              direction = 'SHORT';
+            }
+          }
+          if (!direction) continue;
+
+          log.push(`${new Date(sessionTimestamps[bar]).toISOString()} 📈 FVG detectado: Gap entre ${fvgLow.toFixed(2)}-${fvgHigh.toFixed(2)}`);
+
+          const entryBar = bar + 1;
+          entry = sessionCloses[entryBar];
+          if (direction === 'LONG') {
+            sl = fvgLow;
+            tp = entry + 2 * (entry - sl);
+          } else {
+            sl = fvgHigh;
+            tp = entry - 2 * (sl - entry);
+          }
+
+          const riskDistance = Math.abs(entry - sl);
+          const riskAmount = currentCapital * params.riesgo;
+          const pointValue = pointValues[params.symbol];
+          const positionSize = riskAmount / (riskDistance * pointValue);
+
+          log.push(`${new Date(sessionTimestamps[entryBar]).toISOString()} 💼 ${direction} abierta: Posición ${positionSize.toFixed(1)}; Entrada ${entry.toFixed(2)}; SL ${sl.toFixed(2)}; TP ${tp.toFixed(2)}`);
+
+          // Simulate trade
+          let slCurrent = sl;
+          let exitPrice;
+          let hitType = 'end';
+          for (let simBar = entryBar + 1; simBar < sessionIndices.length; simBar++) {
+            if (params.moverSL && simBar >= entryBar + params.velaSL && slCurrent !== entry) {
+              slCurrent = entry;
+              log.push(`${new Date(sessionTimestamps[simBar]).toISOString()} 🔄 Move SL activado: SL a break-even`);
+            }
+
+            const high = sessionHighs[simBar];
+            const low = sessionLows[simBar];
+
+            if (direction === 'LONG') {
+              if (low <= slCurrent) {
+                exitPrice = slCurrent;
+                hitType = 'SL';
+                break;
+              } else if (high >= tp) {
+                exitPrice = tp;
+                hitType = 'TP';
+                break;
+              }
+            } else {
+              if (high >= slCurrent) {
+                exitPrice = slCurrent;
+                hitType = 'SL';
+                break;
+              } else if (low <= tp) {
+                exitPrice = tp;
+                hitType = 'TP';
+                break;
+              }
+            }
+          }
+          if (!exitPrice) {
+            exitPrice = sessionCloses[sessionIndices.length - 1];
+            hitType = 'end';
+          }
+
+          let pnl;
+          if (direction === 'LONG') {
+            pnl = (exitPrice - entry) * positionSize * pointValue;
+          } else {
+            pnl = (entry - exitPrice) * positionSize * pointValue;
+          }
+          currentCapital += pnl;
+          totalProfit += pnl;
+
+          const color = pnl > 0 ? '🟢' : '🔴';
+          const result = pnl > 0 ? 'ganancia' : 'pérdida';
+          log.push(`${new Date(sessionTimestamps[sessionIndices.length - 1]).toISOString()} ${color} Cerrada: ${pnl.toFixed(2)}$ (${hitType} alcanzado)`);
+
+          if (pnl > 0) {
+            wins++;
+            winsAmount += pnl;
+          } else if (pnl < 0) {
+            losses++;
+            lossesAmount += pnl;
+          }
+
+          const monthKey = day.toISOString().slice(0, 7);
+          monthlyPnl[monthKey] = (monthlyPnl[monthKey] || 0) + pnl;
+
+          peak = Math.max(peak, currentCapital);
+          const currentDD = (peak - currentCapital) / peak;
+          maxDrawdown = Math.max(maxDrawdown, currentDD);
+
+          balanceHistory.push({ date: day.toISOString().split('T')[0], balance: currentCapital });
+
+          tradeOpened = true;
+          break; // Max one trade per session
+        }
+        if (!tradeOpened) daysNoTrade++;
+      }
+
+      // Fill summary
+      document.getElementById('capitalInicial').innerText = `$${params.capital.toFixed(2)}`;
+      document.getElementById('capitalFinal').innerText = `$${currentCapital.toFixed(2)}`;
+      const plColor = totalProfit > 0 ? 'text-green-500' : 'text-red-500';
+      document.getElementById('profitLoss').innerHTML = `<span class="${plColor}">$${totalProfit.toFixed(2)} (${(totalProfit / params.capital * 100).toFixed(2)}%)</span>`;
+      const totalTrades = wins + losses;
+      const winRate = totalTrades > 0 ? (wins / totalTrades * 100).toFixed(2) : 0;
+      document.getElementById('winRate').innerText = `${winRate}%`;
+      document.getElementById('maxDrawdown').innerText = `${(maxDrawdown * 100).toFixed(2)}%`;
+      const profitFactor = Math.abs(lossesAmount) > 0 ? (winsAmount / Math.abs(lossesAmount)).toFixed(2) : '∞';
+      document.getElementById('profitFactor').innerText = profitFactor;
+      const numMonths = Object.keys(monthlyPnl).length;
+      const avgMonthly = numMonths > 0 ? totalProfit / numMonths : 0;
+      const avgMonthlyPct = (avgMonthly / params.capital * 100).toFixed(2);
+      document.getElementById('rendimientoMensual').innerText = `$${avgMonthly.toFixed(2)} (${avgMonthlyPct}%)`;
+      document.getElementById('diasSinOperar').innerText = daysNoTrade;
+
+      const dataVal = document.getElementById('dataValidation');
+      dataVal.innerText = `Datos de Yahoo Finance validados: ${params.symbol}, ${params.startDate.toISOString().split('T')[0]} a ${params.endDate.toISOString().split('T')[0]}`;
+      dataVal.classList.add('text-green-500');
+
+      // Charts
+      const balanceCtx = document.getElementById('balanceChart').getContext('2d');
+      new Chart(balanceCtx, {
+        type: 'line',
+        data: {
+          labels: balanceHistory.map(h => h.date),
+          datasets: [{ label: 'Crecimiento del Saldo', data: balanceHistory.map(h => h.balance), borderColor: '#3b82f6' }]
+        },
+        options: { scales: { x: { type: 'time', time: { unit: 'day' } } }, plugins: { zoom: { zoom: { enabled: true } } } }
+      });
+
+      const pnlCtx = document.getElementById('pnlChart').getContext('2d');
+      const pnlLabels = Object.keys(monthlyPnl);
+      const pnlData = Object.values(monthlyPnl);
+      const pnlColors = pnlData.map(p => p > 0 ? '#22c55e' : '#ef4444');
+      new Chart(pnlCtx, {
+        type: 'bar',
+        data: {
+          labels: pnlLabels,
+          datasets: [{ label: 'P&L Mensual', data: pnlData, backgroundColor: pnlColors }]
+        },
+        options: { scales: { y: { beginAtZero: true } } }
+      });
+
+      // Log table
+      const logBody = document.getElementById('logBody');
+      logBody.innerHTML = '';
+      log.forEach(entry => {
+        const tr = document.createElement('tr');
+        const td = document.createElement('td');
+        td.classList.add('p-2');
+        let colorClass = 'text-blue-500';
+        if (entry.includes('🟢')) colorClass = 'text-green-500';
+        else if (entry.includes('🔴')) colorClass = 'text-red-500';
+        else if (entry.includes('🟡')) colorClass = 'text-yellow-500';
+        td.classList.add(colorClass);
+        td.innerText = entry;
+        tr.appendChild(td);
+        logBody.appendChild(tr);
+      });
+
+      // Export CSV
+      document.getElementById('exportCsvBtn').onclick = () => {
+        const csv = log.join('\n');
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'backtest_log.csv';
+        a.click();
+      };
+
+      // Generate MT5 code
+      document.getElementById('generateMt5Btn').onclick = () => {
+        const mt5Code = `
+#property copyright "Generated by Backtesting FVG App"
+#property link      "https://github.com/ReyMon63/Backtesting"
+#property version   "1.00"
+#property strict
+
+input string Symbol = "${params.symbol}";
+input double RiskPct = ${params.riesgo * 100};
+input bool MoveSL = ${params.moverSL};
+input int VelaSL = ${params.velaSL};
+input int RangoInicial = ${params.rangoInicial};
+input int Ventana = ${params.ventana};
+
+// Add MQL5 code for FVG strategy here...
+// This is a basic template; implement the logic similar to JS.
+
+void OnTick() {
+  // Implement FVG detection and trading logic
+}
+
+// etc.
+        `;
+        const blob = new Blob([mt5Code], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'FVG_EA.mq5';
+        a.click();
+      };
+
+      btn.innerText = 'Backtest';
+      btn.disabled = false;
+      showWindow(2);
+    });
+  </script>
+</body>
+</html>
