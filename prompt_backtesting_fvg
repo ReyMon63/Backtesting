@@ -1,0 +1,75 @@
+Desarrolla una aplicación web para escritorio (no móvil) que realice backtesting de trading con la estrategia Fair Value Gap (FVG) usando datos de Yahoo Finance para futuros (NQ=F, ES=F, 6E=F) en sesiones de alta volatilidad (9:30-10:00 o 20:00-20:30 NY time, lunes a viernes). La aplicación debe ser profesional, con diseño limpio, sin scroll infinito, organizada en cuatro ventanas navegables. Usa Tailwind o Bootstrap para un diseño oscuro, moderno y funcional. Sigue estas especificaciones exactamente y ajusta solo lo indicado si se solicita un cambio.
+
+1. Ventana 1: Parámetros
+- Formulario con campos en orden lógico para trading:
+  - Activo: Dropdown con NQ=F (Nasdaq 100 Futures), ES=F (S&P 500 Futures), 6E=F (Euro FX Futures), default: NQ=F.
+  - Capital: Input numérico ($1,000-$1,000,000, default: $100,000).
+  - Riesgo por Operación: Dropdown (0.5%, 1.0%, 1.5%, 2.0%, default: 1.0%).
+  - Sesión: Dropdown (Matutina 9:30-10:00 NY, Nocturna 20:00-20:30 NY, default: Matutina).
+  - Fecha Inicio: Date (default: 1ero del año).
+  - Fecha Fin: Date (default: hoy).
+  - Mover SL a Break-Even: Checkbox (default: true).
+  - Vela para SL: Dropdown (1, 2, default: 1).
+  - Rango Inicial: Number (3-10 min, default: 5).
+  - Ventana de Operación: Number (15-60 min, default: 30).
+- Botón Backtest con animación de "Procesando..." al hacer clic. Al terminar, redirige automáticamente a la ventana de resumen.
+- Validar símbolo con la API de Yahoo Finance (https://query1.finance.yahoo.com/v8/finance/chart/{symbol}) antes del backtest. Mostrar "Datos validados para {symbol}" en verde si es correcto, o "Símbolo inválido, usa NQ=F, ES=F o 6E=F" en amarillo si falla.
+- Horarios en NY time (EDT, -4 GMT). Convertir a GMT+0 para futura integración con MetaTrader 5.
+
+2. Ventana 2: Resumen
+- Mostrar estadísticas en tarjetas con diseño moderno:
+  - Capital Inicial.
+  - Capital Final.
+  - Profit/Loss (en $ y %, verde para ganancias, rojo para pérdidas).
+  - Win Rate.
+  - Drawdown Máximo.
+  - Profit Factor.
+  - Rendimiento Mensual Promedio.
+  - Días Sin Operar.
+- Incluir tarjeta que confirme: "Datos de Yahoo Finance validados: {symbol}, {start_date} a {end_date}" en verde, o "Error en datos" en amarillo.
+- Botones para navegar a las ventanas de gráficos o log.
+
+3. Ventana 3: Gráficos
+- Dos gráficos con Chart.js, uno arriba del otro:
+  - Gráfico 1: Línea del crecimiento del saldo (mostrando drawdowns).
+  - Gráfico 2: Barras de P&L mensual (verde para ganancias, rojo para pérdidas).
+- Incluir títulos claros, ejes etiquetados y opción de zoom para backtests largos.
+- Botones para navegar al resumen o log.
+
+4. Ventana 4: Log
+- Tabla colapsable con scroll vertical, usando colores:
+  - Verde (🟢) para trades ganadores (LONG).
+  - Rojo (🔴) para trades perdedores (SHORT).
+  - Amarillo (🟡) para warnings.
+  - Azul (🔵) para info del sistema.
+- Detalles por operación: Timestamp, activo, sesión, tipo (LONG/SHORT), entrada, SL, TP, ganancia/pérdida, si tocó SL o TP, si se movió SL a break-even.
+- Ejemplo:
+  [Timestamp] 🔵 Iniciando backtesting...
+  [Timestamp] 📊 Activo: NQ=F, Capital: $100,000
+  [Timestamp] 🔍 Sesión 2024-01-01 matutina (9:30-10:00)
+  [Timestamp] 📈 FVG detectado: Gap entre 15,420-15,425
+  [Timestamp] 💼 LONG abierta: Posición 21.5; Entrada 15,422; SL 15,418; TP 15,430
+  [Timestamp] 🔄 Move SL activado: SL a break-even
+  [Timestamp] 🟢 Cerrada: +$125 (TP alcanzado)
+- Botones para exportar log a CSV y generar código para MetaTrader 5.
+
+5. Estrategia FVG
+- Detección de rango en los primeros 5 minutos (9:30-9:34 o 20:00-20:04 NY).
+- Minutos 6-30: Identificar ruptura con cierre de vela.
+- Vela que rompe el canal (close_price > max_price o < min_price) es la vela 2 del FVG.
+- Verificar gap entre vela 1 (anterior) y vela 3 (siguiente). Si no hay gap, no operar.
+- Entrada al cierre de vela 3 (LONG si ruptura alcista, SHORT si bajista).
+- Stop Loss: Extremo opuesto del FVG.
+- Take Profit: 2:1 risk/reward.
+- Mover SL a break-even si UsarMoverSL=true, usando VelaParaSL (1 o 2 velas).
+- Máximo una operación por sesión. No operar después del minuto 31.
+
+6. Datos
+- Usar API de Yahoo Finance (https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?interval=1m&range={range}&period1={timestamp_inicio}&period2={timestamp_fin}) con proxy CORS (https://api.allorigins.win/get?url={encoded_yahoo_url}).
+- Validar símbolos (NQ=F, ES=F, 6E=F) antes del backtest.
+- Filtrar datos para lunes a viernes, sesiones en NY time.
+
+7. Entregables
+- Código en HTML, CSS, JS en un repositorio GitHub (https://github.com/ReyMon63/Backtesting).
+- Previews funcionales para cada ventana, accesibles via enlaces en Chrome.
+- Ajustes puntuales sin rehacer la aplicación completa.
